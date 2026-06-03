@@ -253,6 +253,12 @@ def api_audit():
 #  RUN
 # ══════════════════════════════════════════════════
 
+@app.route("/")
+def home():
+    return jsonify({
+        "status": "online",
+        "service": "SecureVault API"
+    })
 if __name__ == "__main__":
     app.run(
         debug=False,
