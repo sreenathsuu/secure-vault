@@ -16,6 +16,19 @@ CORS(app)
 app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_MB * 1024 * 1024
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+@app.route("/")
+def home():
+    return jsonify({
+        "status": "online",
+        "service": "SecureVault API"
+    })
+
+@app.route("/health")
+def health():
+    return jsonify({
+        "status": "healthy"
+    })
+
 
 # ══════════════════════════════════════════════════
 #  AUTH
@@ -259,9 +272,11 @@ def home():
         "status": "online",
         "service": "SecureVault API"
     })
-if __name__ == "__main__":
+    if __name__ == "__main__":
     app.run(
         debug=False,
         host="0.0.0.0",
         port=int(os.environ.get("PORT", 5000))
     )
+
+    
