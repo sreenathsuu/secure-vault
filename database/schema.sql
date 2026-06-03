@@ -7,94 +7,103 @@
 CREATE DATABASE IF NOT EXISTS securevault;
 USE securevault;
 
--- ------------------------------------------------------------
--- USERS
--- ------------------------------------------------------------
+
 CREATE TABLE users (
-    id               INT             NOT NULL AUTO_INCREMENT,
-    name             VARCHAR(100)    NOT NULL,
-    email            VARCHAR(150)    NOT NULL UNIQUE,
-    password_hash    VARCHAR(255)    NOT NULL,
-    role             ENUM('admin','manager','analyst','viewer') NOT NULL DEFAULT 'viewer',
-    department       VARCHAR(50)     NOT NULL,
-    clearance_level  TINYINT         NOT NULL DEFAULT 1
-                         CHECK (clearance_level BETWEEN 1 AND 3),
-    is_active        BOOLEAN         NOT NULL DEFAULT TRUE,
-    created_at       TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id)
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100),
+    email VARCHAR(150) UNIQUE,
+    password_hash VARCHAR(255),
+    role ENUM('admin','manager','analyst','viewer'),
+    department VARCHAR(50),
+    clearance_level TINYINT
 );
 
--- ------------------------------------------------------------
--- FILES
--- ------------------------------------------------------------
+INSERT INTO users (name,email,password_hash,role,department,clearance_level) VALUES
+('Arjun','arjun@company.com','admin123','admin','Management',3),
+('Priya','priya@company.com','analyst123','analyst','Finance',2),
+('Kiran','kiran@company.com','viewer123','viewer','HR',1),
+('Rahul','rahul@company.com','manager123','manager','IT',2),
+('Sneha','sneha@company.com','manager123','manager','Finance',2),
+('Amit','amit@company.com','analyst123','analyst','IT',2),
+('Neha','neha@company.com','viewer123','viewer','HR',1),
+('Rohit','rohit@company.com','viewer123','viewer','Operations',1),
+('Divya','divya@company.com','analyst123','analyst','Finance',2),
+('Vikram','vikram@company.com','viewer123','viewer','IT',1),
+('Anjali','anjali@company.com','analyst123','analyst','HR',2),
+('Suresh','suresh@company.com','manager123','manager','Operations',2),
+('Meera','meera@company.com','analyst123','analyst','Finance',2),
+('Karthik','karthik@company.com','viewer123','viewer','IT',1),
+('Isha','isha@company.com','analyst123','analyst','Finance',2),
+('Varun','varun@company.com','viewer123','viewer','HR',1),
+('Pooja','pooja@company.com','manager123','manager','Operations',2),
+('Manoj','manoj@company.com','analyst123','analyst','IT',2),
+('Rekha','rekha@company.com','viewer123','viewer','Finance',1),
+('Admin2','admin2@company.com','admin123','admin','Management',3);
+
+
 CREATE TABLE files (
-    id               INT             NOT NULL AUTO_INCREMENT,
-    filename         VARCHAR(255)    NOT NULL,
-    department       VARCHAR(50)     NOT NULL,
-    description      TEXT,
-    file_size        VARCHAR(20),
-    storage_path     TEXT            NOT NULL,
-    min_clearance    TINYINT         NOT NULL DEFAULT 1
-                         CHECK (min_clearance BETWEEN 1 AND 3),
-    dept_required    VARCHAR(50)     DEFAULT NULL,   -- NULL = open to all depts
-    access_start     TIME            NOT NULL DEFAULT '00:00:00',
-    access_end       TIME            NOT NULL DEFAULT '23:59:59',
-    uploaded_by      INT             NOT NULL,
-    created_at       TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id),
-    FOREIGN KEY (uploaded_by) REFERENCES users(id)
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    filename VARCHAR(255),
+    department VARCHAR(50),
+    description TEXT,
+    min_clearance TINYINT
 );
 
--- ------------------------------------------------------------
--- ROLE-LEVEL PERMISSIONS PER FILE
--- ------------------------------------------------------------
+INSERT INTO files (filename,department,description,min_clearance) VALUES
+('Budget.xlsx','Finance','Budget report',2),
+('Salary.xlsx','Finance','Salary data',3),
+('Tax.pdf','Finance','Tax docs',3),
+('HR_Policies.pdf','HR','Policies',1),
+('Recruitment.xlsx','HR','Hiring data',1),
+('Employee_Data.xlsx','HR','Employee records',2),
+('Server_Config.docx','IT','System config',3),
+('Security_Report.pdf','IT','Security audit',3),
+('Network.png','IT','Network diagram',2),
+('Logs.txt','IT','System logs',3),
+('Ops_Report.pdf','Operations','Operations report',2),
+('Supply.xlsx','Operations','Supply chain',2),
+('Vendor.xlsx','Operations','Vendor list',1),
+('Strategy.pdf','Management','Strategy doc',3),
+('Roadmap.pdf','Management','Roadmap',2),
+('Risk.pdf','Management','Risk analysis',3),
+('Audit.pdf','Finance','Audit report',3),
+('Training.pdf','HR','Training material',1),
+('Assets.xlsx','IT','IT assets',2),
+('Expenses.xlsx','Finance','Expense report',2),
+('Feedback.xlsx','HR','Employee feedback',1),
+('Plan.pdf','Management','Business plan',3),
+('Security.txt','IT','Security rules',3),
+('Performance.xlsx','Operations','Performance data',2),
+('Overview.pdf','Management','Company overview',2);
+
 CREATE TABLE file_role_permissions (
-    file_id  INT  NOT NULL,
-    role     ENUM('admin','manager','analyst','viewer') NOT NULL,
-    PRIMARY KEY (file_id, role),
-    FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE
+    file_id INT,
+    role VARCHAR(20)
 );
 
--- ------------------------------------------------------------
--- AUDIT LOG
--- ------------------------------------------------------------
-CREATE TABLE audit_log (
-    id             BIGINT       NOT NULL AUTO_INCREMENT,
-    user_id        INT          NOT NULL,
-    file_id        INT          NOT NULL,
-    action         VARCHAR(20)  NOT NULL DEFAULT 'READ',
-    ip_address     VARCHAR(45),
-    user_agent     TEXT,
-    access_result  ENUM('GRANTED','DENIED','TIME_LOCKED') NOT NULL,
-    denial_reason  VARCHAR(255),
-    attempted_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id),
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (file_id)  REFERENCES files(id)
-);
-
--- ------------------------------------------------------------
--- SEED DATA
--- ------------------------------------------------------------
-INSERT INTO users (name, email, password_hash, role, department, clearance_level) VALUES
-('Arjun Mehta',  'arjun@company.com',  '$2b$12$hash1', 'admin',   'IT',      3),
-('Priya Rao',    'priya@company.com',  '$2b$12$hash2', 'analyst', 'Finance', 2),
-('Kiran Reddy',  'kiran@company.com',  '$2b$12$hash3', 'viewer',  'HR',      1),
-('Sneha Patel',  'sneha@company.com',  '$2b$12$hash4', 'manager', 'Finance', 2),
-('Dev Kumar',    'dev@company.com',    '$2b$12$hash5', 'analyst', 'IT',      2);
-
-INSERT INTO files (filename, department, description, file_size, storage_path, min_clearance, dept_required, access_start, access_end, uploaded_by) VALUES
-('Q4_Financial_Report.pdf',   'Finance', 'Quarterly financial statements',  '2.4 MB', '/vault/finance/q4_report.pdf',    2, 'Finance', '09:00:00', '18:00:00', 1),
-('Employee_Payroll_Data.xlsx', 'HR',      'Monthly payroll records',         '1.1 MB', '/vault/hr/payroll.xlsx',           2, NULL,      '08:00:00', '20:00:00', 1),
-('System_Architecture.docx',  'IT',      'Internal system design docs',     '890 KB', '/vault/it/architecture.docx',      1, 'IT',      '00:00:00', '23:59:59', 1),
-('Budget_Forecast_2025.xlsx', 'Finance', 'Annual budget — classified',      '3.2 MB', '/vault/finance/budget2025.xlsx',  3, 'Finance', '09:00:00', '17:00:00', 1),
-('Security_Audit_Log.txt',    'IT',      'Complete system audit trail',     '560 KB', '/vault/it/audit.txt',              3, 'IT',      '00:00:00', '23:59:59', 1),
-('HR_Policy_Manual.pdf',      'HR',      'Company HR policies — all staff', '1.8 MB', '/vault/hr/policy_manual.pdf',      1, NULL,      '00:00:00', '23:59:59', 1);
-
-INSERT INTO file_role_permissions (file_id, role) VALUES
+INSERT INTO file_role_permissions VALUES
 (1,'admin'),(1,'manager'),(1,'analyst'),
-(2,'admin'),(2,'manager'),
-(3,'admin'),(3,'analyst'),(3,'manager'),
-(4,'admin'),(4,'manager'),
-(5,'admin'),
-(6,'admin'),(6,'manager'),(6,'analyst'),(6,'viewer');
+(2,'admin'),
+(3,'admin'),
+(4,'viewer'),(4,'analyst'),(4,'manager'),
+(5,'viewer'),(5,'analyst'),
+(6,'analyst'),(6,'manager'),
+(7,'admin'),
+(8,'admin'),
+(9,'manager'),(9,'analyst'),
+(10,'admin'),
+(11,'manager'),
+(12,'analyst'),
+(13,'viewer'),
+(14,'admin'),
+(15,'manager'),
+(16,'admin'),
+(17,'admin'),
+(18,'viewer'),
+(19,'admin'),
+(20,'manager'),
+(21,'viewer'),
+(22,'admin'),
+(23,'admin'),
+(24,'manager'),
+(25,'admin');
