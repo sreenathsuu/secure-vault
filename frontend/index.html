@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SecureVault</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0f14;--surface:#161a23;--surface2:#1e2330;--border:#2a2f3d;
+  --accent:#4f8ef7;--accent2:#6ee7b7;--danger:#f87171;--warn:#fbbf24;
+  --text:#e2e8f0;--muted:#64748b;--success:#34d399;
+  --font:'Courier New',monospace;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:13px;min-height:100vh}
+.app{display:grid;grid-template-columns:220px 1fr;grid-template-rows:52px 1fr;height:100vh;overflow:hidden}
+.topbar{grid-column:1/-1;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:16px}
+.logo{font-size:16px;font-weight:700;color:var(--accent)}
+.logo span{color:var(--accent2)}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.badge{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:3px 8px;font-size:11px;color:var(--muted)}
+.badge.on{border-color:var(--accent);color:var(--accent)}
+#clock{font-size:11px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:3px 10px}
+.sidebar{background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;padding:16px 0;display:flex;flex-direction:column;gap:0}
+.sidebar-label{padding:0 16px;font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin:12px 0 6px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 16px;cursor:pointer;transition:background .15s;color:var(--muted);font-size:12px}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{background:#1a2540;color:var(--accent)}
+.main{overflow-y:auto;padding:24px}
+.section-title{font-size:16px;font-weight:700;margin-bottom:4px}
+.section-sub{font-size:11px;color:var(--muted);margin-bottom:20px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px}
+.stat-val{font-size:22px;font-weight:700}
+.stat-label{font-size:11px;color:var(--muted);margin-top:4px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:12px}
+.file-row{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--border);border-radius:8px;padding:14px 16px;display:grid;grid-template-columns:1fr auto auto auto;gap:16px;align-items:center;margin-bottom:8px;transition:border .2s}
+.file-row:hover{border-color:#3a4050}
+.file-row.granted{border-left-color:var(--success)}
+.file-row.denied{border-left-color:var(--danger);opacity:.75}
+.file-row.time-locked{border-left-color:var(--warn)}
+.file-name{font-size:13px;font-weight:600;margin-bottom:3px}
+.file-meta{font-size:11px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap}
+.chips{display:flex;gap:5px;flex-wrap:wrap}
+.chip{padding:3px 7px;border-radius:3px;font-size:10px;border:1px solid}
+.chip.role{background:#1a2540;border-color:#243050;color:var(--accent)}
+.chip.dept{background:#1a2d24;border-color:#243d30;color:var(--accent2)}
+.chip.clear{background:#2d1f1a;border-color:#3d2f23;color:var(--warn)}
+.chip.time{background:#1f1a2d;border-color:#302540;color:#c084fc}
+.sbadge{padding:4px 10px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.5px}
+.sbadge.GRANTED{background:#0d2a1e;border:1px solid #1a4a35;color:var(--success)}
+.sbadge.DENIED{background:#2a0d0d;border:1px solid #4a1a1a;color:var(--danger)}
+.sbadge.TIME_LOCKED{background:#2a1f0d;border:1px solid #4a3a1a;color:var(--warn)}
+.sbadge.PENDING{background:var(--surface2);border:1px solid var(--border);color:var(--muted)}
+.btn{padding:6px 14px;border-radius:5px;font-size:11px;cursor:pointer;border:1px solid;font-family:var(--font);font-weight:700;transition:all .15s}
+.btn-primary{background:var(--accent);color:#0d0f14;border-color:var(--accent)}
+.btn-primary:hover{opacity:.85}
+.btn-secondary{background:transparent;color:var(--accent);border-color:var(--accent)}
+.btn-secondary:hover{background:#1a2540}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:100}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;width:540px;max-height:82vh;overflow-y:auto}
+.modal-title{font-size:15px;font-weight:700;margin-bottom:4px}
+.modal-sub{font-size:11px;color:var(--muted);margin-bottom:18px}
+.code-block{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px;font-size:11px;color:#94a3b8;line-height:1.9;margin-bottom:12px;white-space:pre-wrap;word-break:break-word}
+.code-block .kw{color:#7dd3fc}
+.code-block .fn{color:#c084fc}
+.code-block .str{color:var(--accent2)}
+.code-block .num{color:var(--warn)}
+.check-item{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.check-item:last-child{border:none}
+.check-dot{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;margin-top:1px}
+.check-dot.pass{background:#0d2a1e;color:var(--success)}
+.check-dot.fail{background:#2a0d0d;color:var(--danger)}
+.check-dot.warn{background:#2a1f0d;color:var(--warn)}
+.result-box{border-radius:6px;padding:12px 16px;margin-top:16px;font-size:12px;display:flex;align-items:center;gap:12px}
+.result-box.GRANTED{background:#0d2a1e;border:1px solid #1a4a35;color:var(--success)}
+.result-box.DENIED{background:#2a0d0d;border:1px solid #4a1a1a;color:var(--danger)}
+.result-box.TIME_LOCKED{background:#2a1f0d;border:1px solid #4a3a1a;color:var(--warn)}
+.result-icon{font-size:20px}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.5px;font-size:10px}
+td{padding:8px 10px;border-bottom:1px solid #1a1e28}
+tr:hover td{background:var(--surface2)}
+.form-group{margin-bottom:12px}
+.form-group label{display:block;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.form-group input,.form-group select{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:8px 10px;font-family:var(--font);font-size:12px;outline:none}
+.form-group input:focus,.form-group select:focus{border-color:var(--accent)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.login-wrap{display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:24px}
+.login-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px;width:360px}
+.login-title{font-size:18px;font-weight:700;color:var(--accent);margin-bottom:4px}
+.login-sub{font-size:12px;color:var(--muted);margin-bottom:24px}
+.error-msg{color:var(--danger);font-size:12px;margin-top:8px}
+.tag{padding:2px 7px;border-radius:3px;font-size:10px}
+.tag-role{background:#1a2540;color:var(--accent)}
+.tag-dept{background:#1a2d24;color:var(--accent2)}
+.tag-cl{background:#2d1f1a;color:var(--warn)}
+.user-card-sm{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;margin:16px}
+#notification{position:fixed;top:16px;right:16px;z-index:999;display:none;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;font-size:12px;min-width:220px}
+#notification.success{border-color:var(--success);color:var(--success)}
+#notification.error{border-color:var(--danger);color:var(--danger)}
+</style>
+</head>
+<body>
+
+<div id="notification"></div>
+<div id="root"></div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────
+const API = "http://localhost:5000/api";
+const state = {
+  token: localStorage.getItem("sv_token") || null,
+  user:  JSON.parse(localStorage.getItem("sv_user") || "null"),
+  nav:   "dashboard",
+  files: [],
+  users: [],
+  audit: [],
+  modal: null,
+  loading: false,
+};
+
+// ─── API helpers ──────────────────────────────────────────────
+async function api(path, opts = {}) {
+  const res = await fetch(API + path, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(state.token ? { Authorization: "Bearer " + state.token } : {}),
+    },
+    ...opts,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Request failed");
+  return data;
+}
+
+// ─── Notification ─────────────────────────────────────────────
+function notify(msg, type = "success") {
+  const el = document.getElementById("notification");
+  el.textContent = msg;
+  el.className = type;
+  el.style.display = "block";
+  setTimeout(() => { el.style.display = "none"; }, 3000);
+}
+
+// ─── Login ────────────────────────────────────────────────────
+function renderLogin() {
+  return `
+  <div class="login-wrap">
+    <div>
+      <div style="font-size:22px;font-weight:700;color:var(--accent);text-align:center">Secure<span style="color:var(--accent2)">Vault</span></div>
+      <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:4px">Attribute-Based Access Control System</div>
+    </div>
+    <div class="login-box">
+      <div class="login-title">Sign in</div>
+      <div class="login-sub">Use your assigned credentials</div>
+      <div class="form-group"><label>Email</label><input id="email" type="email" placeholder="arjun@company.com"/></div>
+      <div class="form-group"><label>Password</label><input id="password" type="password" placeholder="password"/></div>
+      <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="doLogin()">Login</button>
+      <div id="login-error" class="error-msg"></div>
+      <div style="margin-top:16px;font-size:11px;color:var(--muted)">Demo credentials:<br>
+        <b style="color:var(--accent)">arjun@company.com</b> / admin123 (admin, CL3)<br>
+        <b style="color:var(--accent)">priya@company.com</b> / analyst123 (analyst, Finance CL2)<br>
+        <b style="color:var(--accent)">kiran@company.com</b> / viewer123 (viewer, HR CL1)
+      </div>
+    </div>
+  </div>`;
+}
+
+async function doLogin() {
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+  try {
+    const data = await api("/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    });
+    state.token = data.token;
+    state.user  = data.user;
+    localStorage.setItem("sv_token", data.token);
+    localStorage.setItem("sv_user",  JSON.stringify(data.user));
+    await loadAll();
+    render();
+  } catch (e) {
+    document.getElementById("login-error").textContent = e.message;
+  }
+}
+
+function doLogout() {
+  state.token = null; state.user = null;
+  state.files = []; state.users = []; state.audit = [];
+  localStorage.removeItem("sv_token"); localStorage.removeItem("sv_user");
+  render();
+}
+
+// ─── Data loading ─────────────────────────────────────────────
+async function loadAll() {
+  state.files = await api("/files").catch(() => []);
+  state.audit = await api("/audit").catch(() => []);
+  if (state.user?.role === "admin")
+    state.users = await api("/users").catch(() => []);
+}
+
+// ─── Sidebar ──────────────────────────────────────────────────
+function renderSidebar() {
+  const u = state.user;
+  const avColor = ["#4f8ef7","#6ee7b7","#c084fc","#fbbf24","#f87171"][u.id % 5];
+  const navs = [
+    ["dashboard","▦","Dashboard"],
+    ["files","⊟","File Vault"],
+    ...(u.role==="admin"?[["users","◎","Users"]]:[]),
+    ["audit","≡","Audit Log"],
+    ["schema","⊛","DB Schema"],
+  ];
+  return `
+    <div class="sidebar-label">Navigation</div>
+    ${navs.map(([id,icon,label])=>`
+      <div class="nav-item ${state.nav===id?"active":""}" onclick="navigate('${id}')">
+        <span style="font-size:14px">${icon}</span><span>${label}</span>
+      </div>
+    `).join("")}
+    <div style="flex:1"></div>
+    <div class="user-card-sm">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div class="avatar" style="background:${avColor}22;color:${avColor};border:1px solid ${avColor}44">${u.name.split(" ").map(x=>x[0]).join("").slice(0,2)}</div>
+        <div><div style="font-size:12px;font-weight:600">${u.name}</div><div style="font-size:10px;color:var(--muted)">${u.role}</div></div>
+      </div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        <span class="tag tag-role">${u.role}</span>
+        <span class="tag tag-dept">${u.department}</span>
+        <span class="tag tag-cl">CL${u.clearance_level}</span>
+      </div>
+      <button class="btn btn-secondary" style="width:100%;margin-top:10px;font-size:10px" onclick="doLogout()">Logout</button>
+    </div>`;
+}
+
+// ─── Dashboard ────────────────────────────────────────────────
+function renderDashboard() {
+  const u = state.user;
+  const total = state.files.length;
+  const myAudit = state.audit.filter(a=>a.user_name===u.name);
+  const granted = myAudit.filter(a=>a.access_result==="GRANTED").length;
+  const denied  = myAudit.filter(a=>a.access_result==="DENIED").length;
+  return `
+    <div class="section-title">Overview</div>
+    <div class="section-sub">Secure Data Sharing — Attribute-Based Access Control · Logged in as ${u.name}</div>
+    <div class="stats">
+      <div class="stat"><div class="stat-val" style="color:var(--accent)">${total}</div><div class="stat-label">Total files</div></div>
+      <div class="stat"><div class="stat-val" style="color:var(--accent2)">${state.audit.length}</div><div class="stat-label">Audit events</div></div>
+      <div class="stat"><div class="stat-val" style="color:var(--success)">${granted}</div><div class="stat-label">Your grants</div></div>
+      <div class="stat"><div class="stat-val" style="color:var(--danger)">${denied}</div><div class="stat-label">Your denials</div></div>
+    </div>
+    <div class="card">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px">Your ABAC attributes</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:4px">ROLE</div>
+          <div style="font-size:15px;font-weight:700;color:var(--accent)">${u.role}</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:4px">DEPARTMENT</div>
+          <div style="font-size:15px;font-weight:700;color:var(--accent2)">${u.department}</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:4px">CLEARANCE</div>
+          <div style="font-size:15px;font-weight:700;color:var(--warn)">Level ${u.clearance_level}</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px">Recent activity</div>
+      ${state.audit.length===0
+        ?`<div style="color:var(--muted);text-align:center;padding:20px">No events yet</div>`
+        :`<table><thead><tr><th>Time</th><th>User</th><th>File</th><th>Result</th></tr></thead><tbody>
+        ${state.audit.slice(0,8).map(a=>`<tr>
+          <td style="color:var(--muted)">${a.attempted_at?.slice(11,19)||""}</td>
+          <td>${a.user_name}</td>
+          <td style="color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis">${a.filename}</td>
+          <td><span class="sbadge ${a.access_result}">${a.access_result}</span></td>
+        </tr>`).join("")}
+        </tbody></table>`}
+    </div>`;
+}
+
+// ─── Files ────────────────────────────────────────────────────
+function renderFiles() {
+  return `
+    <div class="section-title">File Vault</div>
+    <div class="section-sub">Click "Request Access" to trigger ABAC + time-policy evaluation. Every attempt is logged.</div>
+    ${state.files.map(f=>{
+      const roles = f.allowed_roles || [];
+      return `
+      <div class="file-row" id="fr-${f.id}">
+        <div>
+          <div class="file-name">⊟ ${f.filename}</div>
+          <div class="file-meta">
+            <span>${f.file_size}</span>
+            <span>${f.department}</span>
+            <span style="color:#c084fc">⏱ ${f.access_start?.slice(0,5)}–${f.access_end?.slice(0,5)}</span>
+            <span>${f.description||""}</span>
+          </div>
+        </div>
+        <div class="chips">
+          ${roles.map(r=>`<span class="chip role">${r}</span>`).join("")}
+          ${f.dept_required?`<span class="chip dept">${f.dept_required}</span>`:""}
+          <span class="chip clear">CL${f.min_clearance}+</span>
+        </div>
+        <span class="sbadge PENDING" id="status-${f.id}">PENDING</span>
+        <button class="btn btn-secondary" onclick="requestAccess(${f.id})">Request Access</button>
+      </div>`;
+    }).join("")}`;
+}
+
+async function requestAccess(fileId) {
+  try {
+    const data = await api(`/files/${fileId}/request`, { method: "POST" });
+    showAccessModal(fileId, data);
+    // update status badge
+    const sb = document.getElementById(`status-${fileId}`);
+    if (sb) { sb.className = `sbadge ${data.status}`; sb.textContent = data.status; }
+    const row = document.getElementById(`fr-${fileId}`);
+    if (row) { row.className = `file-row ${data.status.toLowerCase().replace("_","-")}`; }
+    await loadAll();
+  } catch (e) {
+    // even a denied response comes back here via the data
+    notify(e.message, "error");
+  }
+}
+
+function showAccessModal(fileId, data) {
+  const file = state.files.find(f=>f.id===fileId);
+  const icons = { GRANTED:"✓", DENIED:"✗", TIME_LOCKED:"⏰" };
+  const html = `
+    <div class="overlay" onclick="if(event.target===this)closeModal()">
+      <div class="modal">
+        <div style="display:flex;justify-content:space-between;align-items:start">
+          <div>
+            <div class="modal-title">Access Evaluation: ${file?.filename||"File #"+fileId}</div>
+            <div class="modal-sub">ABAC + time-policy check · Audit log ID #${data.audit_log_id}</div>
+          </div>
+          <button class="btn btn-secondary" style="font-size:11px" onclick="closeModal()">✕</button>
+        </div>
+        <div style="margin-bottom:6px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Policy checks</div>
+        ${(data.checks||[]).map(c=>`
+          <div class="check-item">
+            <div class="check-dot ${c.passed?"pass":c.policy==="Time Window"?"warn":"fail"}">${c.passed?"✓":"✗"}</div>
+            <div>
+              <div style="font-size:12px;font-weight:600">${c.policy}</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px">${c.detail}</div>
+            </div>
+          </div>
+        `).join("")}
+        <div style="margin:14px 0 6px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Audit record inserted</div>
+        <div class="code-block"><span class="kw">INSERT INTO</span> audit_log
+  (user_id, file_id, action, access_result)
+<span class="kw">VALUES</span> (<span class="num">${state.user.id}</span>, <span class="num">${fileId}</span>, <span class="str">READ</span>, <span class="str">${data.status}</span>);</div>
+        <div class="result-box ${data.status}">
+          <div class="result-icon">${icons[data.status]}</div>
+          <div>
+            <div style="font-weight:700;font-size:13px">${data.status}</div>
+            <div style="font-size:11px;opacity:.8;margin-top:2px">${data.reason}</div>
+          </div>
+        </div>
+        ${data.status==="GRANTED"?`
+        <button class="btn btn-primary" style="margin-top:12px;width:100%" onclick="notify('File delivered (demo mode — connect backend to download real files)','success');closeModal()">⬇ Download File</button>
+        `:""}
+      </div>
+    </div>`;
+  document.getElementById("modal-root").innerHTML = html;
+}
+
+// ─── Users ────────────────────────────────────────────────────
+function renderUsers() {
+  return `
+    <div class="section-title">User Management</div>
+    <div class="section-sub">Manage ABAC attributes: role, department, clearance level. Admin only.</div>
+    <div class="card" style="margin-bottom:16px">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px">Add new user</div>
+      <div class="form-row" style="margin-bottom:12px">
+        <div class="form-group"><label>Full name</label><input id="u-name" placeholder="Ravi Sharma"/></div>
+        <div class="form-group"><label>Email</label><input id="u-email" placeholder="ravi@company.com"/></div>
+      </div>
+      <div class="form-row" style="margin-bottom:12px">
+        <div class="form-group"><label>Password</label><input id="u-pass" type="password" placeholder="••••••••"/></div>
+        <div class="form-group"><label>Department</label>
+          <select id="u-dept"><option>IT</option><option>Finance</option><option>HR</option><option>Operations</option></select>
+        </div>
+      </div>
+      <div class="form-row" style="margin-bottom:14px">
+        <div class="form-group"><label>Role</label>
+          <select id="u-role"><option value="admin">admin</option><option value="manager">manager</option><option value="analyst" selected>analyst</option><option value="viewer">viewer</option></select>
+        </div>
+        <div class="form-group"><label>Clearance Level</label>
+          <select id="u-cl"><option value="1">Level 1</option><option value="2">Level 2</option><option value="3">Level 3</option></select>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="doCreateUser()">Create User</button>
+    </div>
+    <div class="card">
+      <table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Dept</th><th>CL</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      ${state.users.map(u=>`<tr>
+        <td>${u.name}</td><td style="color:var(--muted)">${u.email}</td>
+        <td><span class="tag tag-role">${u.role}</span></td>
+        <td><span class="tag tag-dept">${u.department}</span></td>
+        <td><span class="tag tag-cl">CL${u.clearance_level}</span></td>
+        <td><span style="color:${u.is_active?"var(--success)":"var(--danger)"}">${u.is_active?"active":"inactive"}</span></td>
+        <td>${u.id!==state.user.id?`<button class="btn btn-secondary" style="font-size:10px;padding:3px 8px" onclick="deactivateUser(${u.id})">Deactivate</button>`:""}</td>
+      </tr>`).join("")}
+      </tbody></table>
+    </div>`;
+}
+
+async function doCreateUser() {
+  try {
+    await api("/users", {
+      method:"POST",
+      body: JSON.stringify({
+        name:            document.getElementById("u-name").value,
+        email:           document.getElementById("u-email").value,
+        password:        document.getElementById("u-pass").value,
+        department:      document.getElementById("u-dept").value,
+        role:            document.getElementById("u-role").value,
+        clearance_level: parseInt(document.getElementById("u-cl").value),
+      }),
+    });
+    notify("User created");
+    state.users = await api("/users");
+    render();
+  } catch(e){ notify(e.message,"error"); }
+}
+
+async function deactivateUser(uid) {
+  try {
+    await api(`/users/${uid}`, { method:"DELETE" });
+    notify("User deactivated");
+    state.users = await api("/users");
+    render();
+  } catch(e){ notify(e.message,"error"); }
+}
+
+// ─── Audit ────────────────────────────────────────────────────
+function renderAudit() {
+  return `
+    <div class="section-title">Audit Log</div>
+    <div class="section-sub">Every access attempt is recorded — granted or denied. Parameterized queries prevent injection on all filters.</div>
+    ${state.audit.length===0
+      ?`<div class="card" style="text-align:center;padding:40px;color:var(--muted)">No events yet. Request access to files to generate log entries.</div>`
+      :`<div class="card" style="overflow:auto">
+      <table><thead><tr><th>#</th><th>Time</th><th>User</th><th>Role</th><th>File</th><th>IP</th><th>Result</th><th>Reason</th></tr></thead>
+      <tbody>${state.audit.map(a=>`<tr>
+        <td style="color:var(--muted)">${a.id}</td>
+        <td style="color:var(--muted)">${a.attempted_at?.slice(11,19)||""}</td>
+        <td>${a.user_name}</td>
+        <td><span class="tag tag-role">${a.role}</span></td>
+        <td style="color:var(--muted)">${a.filename}</td>
+        <td style="color:var(--muted);font-size:10px">${a.ip_address||"–"}</td>
+        <td><span class="sbadge ${a.access_result}">${a.access_result}</span></td>
+        <td style="color:var(--muted)">${a.denial_reason||""}</td>
+      </tr>`).join("")}</tbody></table></div>`}`;
+}
+
+// ─── Schema ───────────────────────────────────────────────────
+function renderSchema() {
+  const kw=s=>`<span class="kw">${s}</span>`;
+  const str=s=>`<span class="str">'${s}'</span>`;
+  const num=s=>`<span class="num">${s}</span>`;
+  const fn=s=>`<span class="fn">${s}</span>`;
+  return `
+    <div class="section-title">Database Schema</div>
+    <div class="section-sub">Full relational schema + the core ABAC access-control query</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+    ${[
+      {name:"users",color:"var(--accent)",fields:["id INT PK","name VARCHAR(100)","email VARCHAR(150) UNIQUE","password_hash VARCHAR(255)","role ENUM(admin|manager|analyst|viewer)","department VARCHAR(50)","clearance_level TINYINT (1–3)","is_active BOOLEAN","created_at TIMESTAMP"]},
+      {name:"files",color:"var(--accent2)",fields:["id INT PK","filename VARCHAR(255)","department VARCHAR(50)","min_clearance TINYINT","dept_required VARCHAR(50) nullable","access_start TIME","access_end TIME","storage_path TEXT","uploaded_by FK→users","created_at TIMESTAMP"]},
+      {name:"file_role_permissions",color:"#c084fc",fields:["file_id FK→files","role ENUM(admin|manager|analyst|viewer)","PRIMARY KEY (file_id, role)"]},
+      {name:"audit_log",color:"var(--warn)",fields:["id BIGINT PK","user_id FK→users","file_id FK→files","action VARCHAR(20)","ip_address VARCHAR(45)","access_result ENUM(GRANTED|DENIED|TIME_LOCKED)","denial_reason VARCHAR(255)","attempted_at TIMESTAMP"]},
+    ].map(t=>`
+      <div class="card">
+        <div style="font-size:11px;color:${t.color};margin-bottom:8px;letter-spacing:.5px">TABLE: ${t.name}</div>
+        ${t.fields.map(f=>{
+          const [col,...rest]=f.split(" ");
+          return `<div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid #1a1e28;font-size:11px"><span style="color:var(--accent2);min-width:140px">${col}</span><span style="color:var(--muted)">${rest.join(" ")}</span></div>`;
+        }).join("")}
+      </div>
+    `).join("")}
+    </div>
+    <div class="card">
+      <div style="font-size:11px;color:var(--accent);margin-bottom:10px;letter-spacing:.5px">CORE ABAC QUERY — fully parameterized</div>
+      <div class="code-block">${kw("SELECT")} f.id, f.filename, f.storage_path
+${kw("FROM")} files f
+${kw("JOIN")} file_role_permissions frp ${kw("ON")} f.id = frp.file_id
+${kw("JOIN")} users u ${kw("ON")} u.id = ${num("%s")}          ${fn("-- :user_id")}
+${kw("WHERE")} f.id = ${num("%s")}                   ${fn("-- :file_id")}
+  ${kw("AND")} frp.role = u.role
+  ${kw("AND")} u.clearance_level >= f.min_clearance
+  ${kw("AND")} (f.dept_required ${kw("IS NULL")} ${kw("OR")} f.dept_required = u.department)
+  ${kw("AND")} (${fn("CURTIME")}() ${kw("BETWEEN")} f.access_start ${kw("AND")} f.access_end);</div>
+      <div style="font-size:11px;color:var(--muted)">All user inputs passed as parameterized values — prevents SQL injection. An audit_log record is inserted for every attempt regardless of outcome.</div>
+    </div>`;
+}
+
+// ─── Main render ──────────────────────────────────────────────
+function render() {
+  if (!state.token || !state.user) {
+    document.getElementById("root").innerHTML = renderLogin();
+    return;
+  }
+  const pages = { dashboard:renderDashboard, files:renderFiles, users:renderUsers, audit:renderAudit, schema:renderSchema };
+  document.getElementById("root").innerHTML = `
+    <div class="app">
+      <div class="topbar">
+        <div class="logo">Secure<span>Vault</span></div>
+        <div class="badge on">ABAC + Time Policy</div>
+        <div class="badge">MySQL Backend</div>
+        <div class="topbar-right"><div id="clock" class="badge">--:--:--</div></div>
+      </div>
+      <div class="sidebar">${renderSidebar()}</div>
+      <div class="main" id="page-content">${(pages[state.nav]||renderDashboard)()}</div>
+    </div>
+    <div id="modal-root"></div>`;
+}
+
+async function navigate(nav) {
+  state.nav = nav;
+  await loadAll();
+  render();
+}
+
+function closeModal() { document.getElementById("modal-root").innerHTML = ""; }
+
+// ─── Clock ────────────────────────────────────────────────────
+setInterval(() => {
+  const el = document.getElementById("clock");
+  if (el) el.textContent = new Date().toLocaleTimeString();
+}, 1000);
+
+// ─── Boot ─────────────────────────────────────────────────────
+(async () => {
+  if (state.token) {
+    try {
+      await loadAll();
+    } catch {
+      state.token = null; state.user = null;
+      localStorage.clear();
+    }
+  }
+  render();
+})();
+</script>
+</body>
+</html>
