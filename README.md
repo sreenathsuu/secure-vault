@@ -1,28 +1,37 @@
-# SecureVault — Secure Data Sharing System
-### Attribute-Based Access Control (ABAC) + Time-Based Policies
-**By Sreenath Mallepalli** | MCA, Yogi Vemana University
+# 🔐 SecureVault — Secure Data Sharing System
+
+![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?style=flat&logo=mysql&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat&logo=python&logoColor=white)
+![Flask](https://img.shields.io/badge/Flask-REST%20API-000000?style=flat&logo=flask)
+![JWT](https://img.shields.io/badge/Auth-JWT-purple?style=flat)
+![bcrypt](https://img.shields.io/badge/Passwords-bcrypt-green?style=flat)
+![License](https://img.shields.io/badge/License-MIT-blue?style=flat)
+
+> A file-sharing backend that enforces **who can access which file, when** — using Attribute-Based Access Control (ABAC) backed by a relational MySQL database.
 
 ---
 
-## Project Overview
+## 📌 What This Project Does
 
-A secure file-sharing backend that enforces who can access which files based on:
-- **Role** (admin / manager / analyst / viewer)
-- **Clearance level** (1, 2, or 3)
-- **Department restriction** (e.g. Finance-only files)
-- **Time window** (e.g. accessible only 09:00–18:00)
+Most systems check only **"is this user logged in?"**. SecureVault checks **four conditions** on every file request:
 
-Every access attempt — granted or denied — is logged to an audit table.
-All SQL queries are **parameterized** to prevent SQL injection.
+| Policy | Example |
+|--------|---------|
+| **Role** | Only `analyst` and `manager` can see Finance files |
+| **Clearance Level** | Salary data needs CL3 — a CL1 viewer is denied |
+| **Department** | HR files restricted to HR department only |
+| **Time Window** | Server configs accessible only 09:00–18:00 |
+
+Every access attempt — **granted or denied** — is recorded in `audit_log`. No attempt goes unlogged.
 
 ---
 
-## Project Structure
+## 🗂️ Project Structure
 
 ```
 securevault/
 ├── database/
-│   └── schema.sql          # Full MySQL schema + seed data
+│   └── schema.sql          # Full MySQL schema, seed data, views, procedure, trigger
 ├── backend/
 │   ├── app.py              # Flask REST API (all routes)
 │   ├── access_control.py   # ABAC + time-policy engine
@@ -31,94 +40,158 @@ securevault/
 │   ├── config.py           # Environment config
 │   └── requirements.txt    # Python dependencies
 └── frontend/
-    └── index.html          # Single-file UI (no build step)
+    └── index.html          # Single-file UI (no build step needed)
 ```
 
 ---
 
-## Setup
+## 🗄️ Database Schema
+
+Four tables, each with a clear purpose:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                        users                            │
+│  id | name | email | password_hash | role | department  │
+│       clearance_level | is_active | created_at          │
+└──────────────────────────┬──────────────────────────────┘
+                           │ user_id FK
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│                      audit_log                          │
+│  id | user_id | file_id | action | ip_address           │
+│       access_result | denial_reason | attempted_at      │
+└──────────────────────────┬──────────────────────────────┘
+                           │ file_id FK
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│                        files                            │
+│  id | filename | department | min_clearance             │
+│       dept_required | access_start | access_end         │
+│       storage_path | uploaded_by | created_at           │
+└──────────────────────────┬──────────────────────────────┘
+                           │ file_id FK
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│               file_role_permissions                     │
+│  file_id (FK) | role                                    │
+│  PRIMARY KEY (file_id, role)                            │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Extra database objects included:
+| Object | Name | Purpose |
+|--------|------|---------|
+| **View** | `v_audit_log` | Human-readable audit log with user + file names joined |
+| **View** | `v_user_access_summary` | Per-user grant/deny statistics with grant rate % |
+| **Stored Procedure** | `get_accessible_files(user_id)` | Returns all files accessible to a user right now |
+| **Trigger** | `trg_deactivate_audit` | Auto-logs to audit_log when a user account is deactivated |
+
+---
+
+## ⚙️ Core ABAC Query
+
+This single query decides access — fully parameterized, no string interpolation:
+
+```sql
+SELECT f.id, f.filename, f.storage_path
+FROM files f
+JOIN file_role_permissions frp ON f.id = frp.file_id
+JOIN users u ON u.id = %s              -- :user_id (parameterized)
+WHERE f.id = %s                        -- :file_id (parameterized)
+  AND frp.role = u.role                -- role check
+  AND u.clearance_level >= f.min_clearance   -- clearance check
+  AND (f.dept_required IS NULL OR f.dept_required = u.department)  -- dept check
+  AND (CURTIME() BETWEEN f.access_start AND f.access_end);         -- time check
+```
+
+---
+
+## 🚀 Setup
 
 ### 1. MySQL Database
-
 ```bash
 mysql -u root -p < database/schema.sql
 ```
-
-This creates the `securevault` database with all tables and demo users.
+This creates the `securevault` database with all tables, views, procedures, triggers, and demo data.
 
 ### 2. Backend
-
 ```bash
 cd backend
 pip install -r requirements.txt
 
-# Set environment variables (or create a .env file)
-export DB_HOST=localhost
-export DB_USER=root
-export DB_PASSWORD=yourpassword
-export SECRET_KEY=change-this-in-prod
+# Create a .env file:
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=yourpassword
+SECRET_KEY=change-this-in-production
 
 python app.py
 # API running at http://localhost:5000
 ```
 
 ### 3. Frontend
-
-Open `frontend/index.html` directly in a browser — no build step needed.
+```bash
+# Open directly in browser — no build step needed
+open frontend/index.html
+```
 
 ---
 
-## Demo Credentials (from seed data)
+## 👥 Demo Credentials
 
-| Email | Password | Role | Dept | Clearance |
-|---|---|---|---|---|
-| arjun@company.com | admin123 | admin | IT | 3 |
+| Email | Password | Role | Department | Clearance |
+|-------|----------|------|------------|-----------|
+| arjun@company.com | admin123 | admin | Management | 3 |
 | priya@company.com | analyst123 | analyst | Finance | 2 |
 | kiran@company.com | viewer123 | viewer | HR | 1 |
 | sneha@company.com | manager123 | manager | Finance | 2 |
-| dev@company.com | analyst123 | analyst | IT | 2 |
+
+> Passwords are stored as **bcrypt hashes** in the database. Plain-text passwords above are for demo login only.
 
 ---
 
-## API Endpoints
+## 🔌 API Endpoints
 
 | Method | Route | Auth | Description |
-|---|---|---|---|
-| POST | /api/login | None | Login → JWT token |
-| GET | /api/me | JWT | Current user profile |
-| GET | /api/files | JWT | List all files + policies |
-| POST | /api/files/:id/request | JWT | Evaluate ABAC access + log |
-| GET | /api/files/:id/download | JWT | Download if access granted |
-| POST | /api/files/upload | Admin JWT | Upload file + set policy |
-| GET | /api/users | Admin JWT | List all users |
-| POST | /api/users | Admin JWT | Create user |
-| DELETE | /api/users/:id | Admin JWT | Deactivate user |
-| GET | /api/audit | JWT | Audit log (admin=all, others=own) |
+|--------|-------|------|-------------|
+| POST | `/api/login` | None | Login → JWT token |
+| GET | `/api/me` | JWT | Current user profile |
+| GET | `/api/files` | JWT | List all files with policies |
+| POST | `/api/files/:id/request` | JWT | Evaluate ABAC + log result |
+| GET | `/api/files/:id/download` | JWT | Download if access granted |
+| POST | `/api/files/upload` | Admin | Upload file + set policy |
+| GET | `/api/users` | Admin | List all users |
+| POST | `/api/users` | Admin | Create user |
+| DELETE | `/api/users/:id` | Admin | Deactivate user |
+| GET | `/api/audit` | JWT | Audit log (admin=all, others=own) |
 
 ---
 
-## Core ABAC Query
+## 🛠️ Technologies
 
-```sql
-SELECT f.id, f.filename, f.storage_path
-FROM files f
-JOIN file_role_permissions frp ON f.id = frp.file_id
-JOIN users u ON u.id = %s          -- parameterized: user_id
-WHERE f.id = %s                    -- parameterized: file_id
-  AND frp.role = u.role
-  AND u.clearance_level >= f.min_clearance
-  AND (f.dept_required IS NULL OR f.dept_required = u.department)
-  AND (CURTIME() BETWEEN f.access_start AND f.access_end);
-```
-
-All inputs are parameterized — no string interpolation of user data anywhere.
+| Layer | Technology |
+|-------|-----------|
+| Database | MySQL 8.0 — RDBMS, schema design, Views, Stored Procedure, Trigger |
+| Backend | Python 3.10 + Flask — REST API |
+| Auth | JWT (JSON Web Tokens) — stateless authentication |
+| DB Driver | mysql-connector-python — parameterized queries |
+| Security | bcrypt — password hashing |
+| Frontend | Vanilla JS + HTML/CSS — zero dependencies |
 
 ---
 
-## Technologies
+## 🔒 Security Notes
 
-- **MySQL** — relational database, schema design, ACID transactions
-- **Python + Flask** — REST API, JWT auth
-- **mysql-connector-python** — parameterized queries
-- **bcrypt** — password hashing
-- **Vanilla JS** — frontend (zero dependencies, no build step)
+- All SQL inputs use **parameterized queries** — no string interpolation of user data anywhere
+- Passwords stored as **bcrypt hashes** — never plain text
+- JWT tokens expire and must be sent in `Authorization: Bearer <token>` header
+- Every access attempt is logged — including denied ones — for full traceability
+
+---
+
+## 👤 Author
+
+**Mallepalli Sreenath**  
+MCA — Yogi Vemana University, Kadapa  
+[GitHub](https://github.com/sreenathsuu)
